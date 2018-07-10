@@ -1,0 +1,106 @@
+
+#####################################
+Tomcat
+#####################################
+
+#준비
+-jdk 1.8
+-tomcat 8
+
+----------------------------------------------------------------------------
+FROM centos:centos7
+MAINTAINER LAHUMAN <lahuman1@gmail.com>
+
+RUN yum -y update; yum clean all
+RUN yum -y install epel-release tar ; yum clean all
+
+ADD apache-tomcat-8.0.21 /usr/local/apache-tomcat-8.0.21
+ADD jdk1.8.0_40 /usr/local/jdk1.8.0_40
+
+ADD server.xml /usr/local/apache-tomcat-8.0.21/conf/server.xml
+
+ENV JAVA_HOME /usr/local/jdk1.8.0_40
+
+RUN mkdir /data
+
+EXPOSE 8080
+EXPOSE 8009
+
+VOLUME /data
+----------------------------------------------------------------------------
+
+docker build --rm -t <image name> .
+
+docker run --name doc4sm1 -h lahuman --mac-address 02-42-AC-11-00-62 --link mariadb-doc4sm:mariadb -d -it -v /home/docker/doc4sm/data:/data  --privileged=true  lahuman/doc4sm:centos7 /usr/local/apache-tomcat-8.0.21/bin/catalina.sh run
+docker run --name doc4sm2 -h lahuman --mac-address 02-42-AC-11-00-62 --link mariadb-doc4sm:mariadb -d -it -v /home/docker/doc4sm/data:/data  --privileged=true  lahuman/doc4sm:centos7 /usr/local/apache-tomcat-8.0.21/bin/catalina.sh run
+
+
+#####################################
+NGINX
+#####################################
+
+
+----------------------------------------------------------------------------
+FROM centos:centos7
+MAINTAINER The CentOS Project <cloud-ops@centos.org>
+
+RUN yum -y update; yum clean all
+RUN yum -y install epel-release tar ; yum clean all
+RUN yum -y install nginx ; yum clean all
+ADD nginx.conf /etc/nginx/nginx.conf
+RUN echo "daemon off;" >> /etc/nginx/nginx.conf
+RUN curl https://git.centos.org/sources/httpd/c7/acf5cccf4afaecf3afeb18c50ae59fd5c6504910 
+    | tar -xz -C /usr/share/nginx/html 
+    --strip-components=1
+RUN sed -i -e 's/Apache/nginx/g' -e '/apache_pb.gif/d' 
+    /usr/share/nginx/html/index.html
+
+RUN mkdir /webapp
+
+EXPOSE 80
+
+VOLUME /webapp
+
+CMD [ "/usr/sbin/nginx" ]
+----------------------------------------------------------------------------
+
+#nginx.conf
+----------------------------------------------------------------------------
+    #doc4sm
+    upstream doc4sm_servers{
+        ip_hash;
+        server doc4sm1:8080;
+        server doc4sm2:8080;
+
+    }
+    server {
+        listen  80;
+        server_name doc4sm.lahuman.pe.kr;
+
+        location / {
+                proxy_pass http://doc4sm_servers;
+        }
+    }
+----------------------------------------------------------------------------
+
+docker build -rm -t lahuman/home:centos7 .
+
+docker run --name lahuman --link doc4sm1:doc4sm1 --link doc4sm2:doc4sm2 -d -p 80:80 -v /home/docker/lahuman.pe.kr/webapp:/webapp  --privileged=true  lahuman/home:centos7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
